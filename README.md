@@ -1,146 +1,208 @@
-<<<<<<< HEAD
-# Smart Attendance System — Face Recognition + SQLite
+# 🎓 Smart Attendance System — Face Recognition
 
-A complete attendance system using OpenCV, `face_recognition`, and SQLite.
-No cloud, no subscription — runs entirely on your local machine.
-
----
-
-## Project Structure
-
-```
-attendance_system/
-├── attendance_system.py   ← core: register / live recognition / report
-├── dashboard.py           ← HTML dashboard + CSV export
-├── requirements.txt
-├── attendance.db          ← auto-created SQLite database
-├── encodings/             ← auto-created, stores .pkl face encodings
-└── photos/                ← auto-created, reserved for raw captures
-```
+An automated attendance system using **Python**, **OpenCV**, **Flask**, and **SQLite**.  
+Detects and recognizes faces in real time via webcam and logs attendance into a database.  
+Includes a full **web dashboard** accessible from any browser on the same network.
 
 ---
 
-## Setup
+## 📸 Features
 
-### 1. Install dependencies
+-  Real-time face detection and recognition via webcam
+-  Web-based dashboard (Flask) — no CMD needed after setup
+-  Register new faces directly from the browser
+-  Attendance auto-logged to SQLite with timestamp
+-  Cooldown system — prevents duplicate entries
+-  View attendance by date with filters
+-  Export attendance records as CSV
+-  Live camera feed with bounding boxes in browser
+-  Weekly attendance bar chart on dashboard
 
+---
+
+## 🛠️ Tech Stack
+
+| Layer       | Technology                        |
+|-------------|-----------------------------------|
+| Language    | Python 3.10+                      |
+| Face AI     | face_recognition, dlib            |
+| Computer Vision | OpenCV                        |
+| Web Server  | Flask                             |
+| Database    | SQLite3                           |
+| Frontend    | HTML, CSS, JavaScript             |
+
+---
+
+## 📁 Project Structure
+
+```
+Smart-Attendance-System/
+├── app.py                  ← Flask web server (main entry point)
+├── attendance_system.py    ← CLI-based core (register / run / report)
+├── dashboard.py            ← Static HTML report generator
+├── requirements.txt        ← Python dependencies
+├── templates/
+│   └── index.html          ← Web dashboard UI
+├── encodings/              ← Auto-created: stores face encodings (.pkl)
+├── photos/                 ← Auto-created: reserved for captures
+└── attendance.db           ← Auto-created: SQLite database
+```
+
+---
+
+## ⚙️ Installation
+
+### 1. Clone the repository
+```bash
+git clone https://github.com/ved2a/Smart-Attendance-System.git
+cd Smart-Attendance-System
+```
+
+### 2. Install dependencies
+
+**On Windows (recommended):**
+```bash
+pip install dlib-bin
+pip install face_recognition --no-deps
+pip install face-recognition-models click colorama
+pip install opencv-python flask numpy pillow
+```
+
+**On Linux/macOS:**
 ```bash
 pip install -r requirements.txt
 ```
 
-> **Note on `dlib` (required by `face_recognition`):**
-> On Windows, install the prebuilt wheel:
-> ```
-> pip install dlib-bin
-> ```
-> On Linux/macOS `dlib` builds from source — requires `cmake` and a C++ compiler.
+> **Note:** On Windows, always install `dlib-bin` first before `face_recognition` to avoid build errors.
 
 ---
 
-## Usage
+## 🚀 Usage
 
-### Register a new person
-Opens your webcam, captures 5 face samples, then saves the encoding.
+### Option A — Web Dashboard (Recommended)
 
 ```bash
-python attendance_system.py --register --name "Alice"
-python attendance_system.py --register --name "Bob"
+python app.py
+```
+Then open **http://localhost:5000** in your browser.
+
+| Page | What you can do |
+|------|----------------|
+| Dashboard | View live camera feed + today's log + weekly chart |
+| Register Face | Add new students via webcam |
+| Attendance | Filter records by date |
+| Students | View all registered students |
+| Export CSV | Download last 30 days attendance |
+
+---
+
+### Option B — Command Line
+
+**Register a new face:**
+```bash
+python attendance_system.py --register --name "Vedant"
 ```
 
-### Run live attendance
-Opens webcam, continuously recognizes faces, logs to SQLite.
-Same person is NOT re-logged within 60 seconds (configurable via `COOLDOWN_SEC`).
-
+**Start live attendance:**
 ```bash
 python attendance_system.py --run
 # Press Q to quit
 ```
 
-### Print terminal report (today)
+**View today's report:**
 ```bash
 python attendance_system.py --report
 ```
 
-### Print terminal report (specific date)
+**View report for specific date:**
 ```bash
-python attendance_system.py --report --date 2025-06-19
+python attendance_system.py --report --date 2026-06-20
+```
+
+**Generate HTML report:**
+```bash
+python dashboard.py
+python dashboard.py --export    # also exports CSV
 ```
 
 ---
 
-## Dashboard
-
-Generates a dark-themed HTML dashboard + optional CSV:
-
-```bash
-python dashboard.py                     # today's report → report.html
-python dashboard.py --date 2025-06-19  # specific date
-python dashboard.py --export            # also writes attendance_export.csv
-```
-
-Open `report.html` in any browser.
-
----
-
-## Database Schema
+## 🗄️ Database Schema
 
 ```sql
--- students table
-id        INTEGER PRIMARY KEY
-name      TEXT UNIQUE NOT NULL
-reg_date  TEXT
+-- Students table
+CREATE TABLE students (
+    id       INTEGER PRIMARY KEY AUTOINCREMENT,
+    name     TEXT NOT NULL UNIQUE,
+    reg_date TEXT NOT NULL
+);
 
--- attendance table
-id          INTEGER PRIMARY KEY
-student_id  INTEGER → students.id
-timestamp   TEXT (ISO 8601, seconds)
-date        TEXT (YYYY-MM-DD)
-status      TEXT DEFAULT 'PRESENT'
+-- Attendance table
+CREATE TABLE attendance (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    student_id INTEGER NOT NULL,
+    timestamp  TEXT NOT NULL,
+    date       TEXT NOT NULL,
+    status     TEXT DEFAULT 'PRESENT',
+    FOREIGN KEY (student_id) REFERENCES students(id)
+);
 ```
 
 ---
 
-## Configuration (attendance_system.py top)
-
-| Variable       | Default | Description                              |
-|----------------|---------|------------------------------------------|
-| `TOLERANCE`    | `0.5`   | Face match threshold (lower = stricter)  |
-| `FRAME_SCALE`  | `0.5`   | Downscale factor for speed               |
-| `COOLDOWN_SEC` | `60`    | Seconds before same person re-logged     |
-
----
-
-## How It Works
+## 🧠 How It Works
 
 ```
-Camera frame
-    │
-    ▼
-Resize (FRAME_SCALE) ──▶ face_recognition.face_locations()
-                                    │
-                                    ▼
-                         face_recognition.face_encodings()
-                                    │
-                                    ▼
-                     Compare vs. stored encodings (L2 distance)
-                                    │
-                         ┌──────────┴──────────┐
-                    distance < 0.5          distance ≥ 0.5
-                    (MATCHED)               (UNKNOWN)
-                         │
-                         ▼
-                 Log to SQLite (with cooldown)
-                 Draw green box + name
+Webcam Frame
+     │
+     ▼
+Resize to 50% (for speed)
+     │
+     ▼
+face_recognition.face_locations()   ← finds face positions
+     │
+     ▼
+face_recognition.face_encodings()   ← generates 128-D vector
+     │
+     ▼
+Compare with stored encodings (Euclidean / L2 distance)
+     │
+     ├── distance < 0.5  →  MATCH  →  Log to SQLite  →  Green box
+     │
+     └── distance ≥ 0.5  →  UNKNOWN  →  Red box
 ```
 
 ---
 
-## Tips
+## 🔧 Configuration
 
-- Register in the same lighting you'll use for attendance.
-- For groups, position the camera at eye level.
-- `TOLERANCE = 0.4` gives fewer false positives (stricter).
-- Use `model="cnn"` in `face_locations()` for GPU-accelerated accuracy.
-=======
-# Smart-Attendance-System
->>>>>>> 8e90d00cb66fbee329d89180311e64e2da3407c0
+Edit these constants at the top of `app.py` or `attendance_system.py`:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `TOLERANCE` | `0.5` | Match threshold — lower is stricter |
+| `FRAME_SCALE` | `0.5` | Frame resize factor for speed |
+| `COOLDOWN_SEC` | `60` | Seconds before same person is re-logged |
+
+---
+
+## 💡 Tips
+
+- Register faces in the **same lighting** as the attendance environment
+- Keep camera at **eye level** for best detection accuracy
+- Use `TOLERANCE = 0.4` for stricter matching (fewer false positives)
+- Access dashboard from **any device on the same WiFi** via `http://192.168.x.x:5000`
+
+---
+
+## 👤 Author
+
+**Vedant Akare**  
+B.Tech CSE-IoT | YCCE Nagpur  
+GitHub: [@ved2a](https://github.com/ved2a)
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License.
