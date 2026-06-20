@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Smart Attendance System — Face Recognition + SQLite
 
 A complete attendance system using OpenCV, `face_recognition`, and SQLite.
@@ -140,3 +141,6 @@ Resize (FRAME_SCALE) ──▶ face_recognition.face_locations()
 - For groups, position the camera at eye level.
 - `TOLERANCE = 0.4` gives fewer false positives (stricter).
 - Use `model="cnn"` in `face_locations()` for GPU-accelerated accuracy.
+=======
+# Smart-Attendance-System
+>>>>>>> 8e90d00cb66fbee329d89180311e64e2da3407c0
