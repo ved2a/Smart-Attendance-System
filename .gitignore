@@ -1,0 +1,7 @@
+__pycache__/
+encodings/
+photos/
+attendance.db
+*.pkl
+report.html
+*.pyc

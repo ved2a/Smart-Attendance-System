@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Smart Attendance System</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap');
+
+  :root {
+    --bg:      #080c14;
+    --surface: #0e1420;
+    --card:    #131926;
+    --border:  #1e2736;
+    --accent:  #3b82f6;
+    --green:   #10b981;
+    --red:     #f43f5e;
+    --amber:   #f59e0b;
+    --text:    #e2e8f0;
+    --muted:   #64748b;
+    --scan:    #3b82f6;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: grid;
+    grid-template-rows: 56px 1fr;
+    grid-template-columns: 220px 1fr;
+  }
+
+  /* ── Topbar ── */
+  .topbar {
+    grid-column: 1 / -1;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 24px;
+    gap: 12px;
+  }
+  .topbar .logo {
+    font-size: 1.1rem;
+    font-weight: 800;
+    letter-spacing: -.02em;
+    color: var(--text);
+  }
+  .topbar .logo span { color: var(--accent); }
+  .topbar .badge {
+    margin-left: auto;
+    background: rgba(16,185,129,.12);
+    color: var(--green);
+    font-size: .72rem;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 99px;
+    letter-spacing: .06em;
+  }
+  .clock {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: .8rem;
+    color: var(--muted);
+    margin-left: 16px;
+  }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 20px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: .85rem;
+    font-weight: 500;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all .15s;
+    border: none;
+    background: none;
+    width: 100%;
+    text-align: left;
+  }
+  .nav-item:hover  { background: var(--card); color: var(--text); }
+  .nav-item.active { background: rgba(59,130,246,.12); color: var(--accent); }
+  .nav-item .icon  { font-size: 1rem; width: 20px; text-align: center; }
+  .nav-sep { height: 1px; background: var(--border); margin: 8px 0; }
+
+  /* ── Main ── */
+  main {
+    overflow-y: auto;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  /* ── Pages ── */
+  .page { display: none; flex-direction: column; gap: 20px; }
+  .page.active { display: flex; }
+
+  /* ── Stats row ── */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+  }
+  .stat {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 20px;
+  }
+  .stat .val  { font-size: 2rem; font-weight: 800; line-height: 1; margin-bottom: 4px; }
+  .stat .lbl  { font-size: .72rem; font-weight: 600; text-transform: uppercase;
+                letter-spacing: .08em; color: var(--muted); }
+  .c-blue  { color: var(--accent); }
+  .c-green { color: var(--green);  }
+  .c-red   { color: var(--red);    }
+  .c-amber { color: var(--amber);  }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .card-header {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .card-title {
+    font-size: .78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    color: var(--muted);
+  }
+
+  /* ── Camera grid ── */
+  .cam-grid { display: grid; grid-template-columns: 1fr 320px; gap: 20px; }
+
+  .cam-wrap {
+    position: relative;
+    border-radius: 10px;
+    overflow: hidden;
+    background: #000;
+    aspect-ratio: 4/3;
+  }
+  .cam-wrap img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  /* scanning line */
+  .scan-line {
+    position: absolute;
+    left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--scan), transparent);
+    animation: scanMove 2.5s linear infinite;
+    opacity: .6;
+  }
+  @keyframes scanMove {
+    0%   { top: 0%; }
+    100% { top: 100%; }
+  }
+
+  .cam-corner {
+    position: absolute;
+    width: 20px; height: 20px;
+    border-color: var(--accent);
+    border-style: solid;
+    opacity: .7;
+  }
+  .cam-corner.tl { top:8px;    left:8px;   border-width: 2px 0 0 2px; }
+  .cam-corner.tr { top:8px;    right:8px;  border-width: 2px 2px 0 0; }
+  .cam-corner.bl { bottom:8px; left:8px;   border-width: 0 0 2px 2px; }
+  .cam-corner.br { bottom:8px; right:8px;  border-width: 0 2px 2px 0; }
+
+  /* ── Log feed ── */
+  .log-feed {
+    height: 100%;
+    max-height: 340px;
+    overflow-y: auto;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .log-entry {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: var(--surface);
+    border-radius: 8px;
+    font-size: .82rem;
+    border-left: 3px solid var(--green);
+    animation: slideIn .3s ease;
+  }
+  @keyframes slideIn {
+    from { opacity:0; transform: translateX(-8px); }
+    to   { opacity:1; transform: translateX(0); }
+  }
+  .log-entry .name { font-weight: 600; flex: 1; }
+  .log-entry .time { font-family: 'JetBrains Mono', monospace; font-size: .72rem; color: var(--muted); }
+
+  /* ── Table ── */
+  table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+  th, td { padding: 11px 20px; text-align: left; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,.02); }
+
+  .pill {
+    display: inline-block; padding: 2px 10px; border-radius: 99px;
+    font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+  }
+  .pill-green { background: rgba(16,185,129,.12); color: var(--green); }
+  .pill-red   { background: rgba(244,63,94,.12);  color: var(--red);   }
+  .pill-blue  { background: rgba(59,130,246,.12); color: var(--accent); }
+
+  /* ── Register ── */
+  .reg-wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+
+  .reg-cam-wrap {
+    border-radius: 10px; overflow: hidden;
+    background: #000; aspect-ratio: 4/3; position: relative;
+  }
+  .reg-cam-wrap img { width: 100%; height: 100%; object-fit: cover; }
+
+  .reg-panel { display: flex; flex-direction: column; gap: 14px; padding: 4px 0; }
+
+  input[type=text] {
+    width: 100%;
+    padding: 10px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: .9rem;
+    font-family: 'Inter', sans-serif;
+    outline: none;
+    transition: border-color .15s;
+  }
+  input[type=text]:focus { border-color: var(--accent); }
+
+  .btn {
+    padding: 10px 18px;
+    border-radius: 8px;
+    border: none;
+    font-size: .88rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .15s;
+    font-family: 'Inter', sans-serif;
+  }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: #2563eb; }
+  .btn-ghost { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+  .btn-ghost:hover { background: var(--border); }
+  .btn:disabled { opacity: .4; cursor: not-allowed; }
+
+  .sample-bar {
+    display: flex; gap: 8px;
+  }
+  .sample-dot {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: var(--border); border: 2px solid var(--border);
+    transition: all .2s;
+    display: grid; place-items: center; font-size: .75rem; color: var(--muted);
+  }
+  .sample-dot.filled { background: var(--green); border-color: var(--green); color: #fff; }
+
+  .reg-status {
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: .85rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    min-height: 42px;
+  }
+  .reg-status.ok  { border-color: var(--green); color: var(--green); background: rgba(16,185,129,.06); }
+  .reg-status.err { border-color: var(--red);   color: var(--red);   background: rgba(244,63,94,.06);  }
+
+  /* ── Date picker ── */
+  input[type=date] {
+    padding: 6px 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: .82rem;
+    font-family: 'Inter', sans-serif;
+    outline: none;
+    cursor: pointer;
+  }
+
+  /* ── Export btn ── */
+  .export-row { display: flex; gap: 10px; align-items: center; }
+
+  /* ── Bar chart ── */
+  .bar-chart {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    height: 80px;
+    padding: 0 20px 14px;
+  }
+  .bar-col { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 1; }
+  .bar {
+    width: 100%;
+    background: rgba(59,130,246,.3);
+    border-radius: 4px 4px 0 0;
+    border: 1px solid rgba(59,130,246,.5);
+    min-height: 4px;
+    transition: height .4s ease;
+  }
+  .bar-lbl { font-size: .62rem; color: var(--muted); }
+
+  /* ── Empty ── */
+  .empty { padding: 32px 20px; text-align: center; color: var(--muted); font-size: .85rem; }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<!-- Topbar -->
+<header class="topbar">
+  <div class="logo">Face<span>Track</span></div>
+  <span class="badge">● LIVE</span>
+  <div class="clock" id="clock">--:--:--</div>
+</header>
+
+<!-- Sidebar -->
+<nav class="sidebar">
+  <button class="nav-item active" onclick="showPage('dashboard')">
+    <span class="icon">📊</span> Dashboard
+  </button>
+  <button class="nav-item" onclick="showPage('attendance')">
+    <span class="icon">📋</span> Attendance
+  </button>
+  <button class="nav-item" onclick="showPage('register')">
+    <span class="icon">➕</span> Register Face
+  </button>
+  <div class="nav-sep"></div>
+  <button class="nav-item" onclick="showPage('students')">
+    <span class="icon">👥</span> Students
+  </button>
+  <button class="nav-item" onclick="exportCSV()">
+    <span class="icon">⬇️</span> Export CSV
+  </button>
+</nav>
+
+<!-- Main -->
+<main>
+
+  <!-- ── DASHBOARD PAGE ── -->
+  <div class="page active" id="page-dashboard">
+
+    <div class="stats">
+      <div class="stat"><div class="val c-blue"  id="s-total">—</div><div class="lbl">Registered</div></div>
+      <div class="stat"><div class="val c-green" id="s-present">—</div><div class="lbl">Present Today</div></div>
+      <div class="stat"><div class="val c-red"   id="s-absent">—</div><div class="lbl">Absent Today</div></div>
+      <div class="stat"><div class="val c-amber" id="s-rate">—</div><div class="lbl">Attendance Rate</div></div>
+    </div>
+
+    <!-- Camera + live log -->
+    <div class="cam-grid">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">📷 Live Camera</span>
+          <span class="pill pill-green" id="cam-status">Recognizing</span>
+        </div>
+        <div style="padding:12px">
+          <div class="cam-wrap">
+            <img src="/video_feed" alt="Live Feed">
+            <div class="scan-line"></div>
+            <div class="cam-corner tl"></div>
+            <div class="cam-corner tr"></div>
+            <div class="cam-corner bl"></div>
+            <div class="cam-corner br"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="display:flex;flex-direction:column">
+        <div class="card-header">
+          <span class="card-title">✅ Today's Log</span>
+        </div>
+        <div class="log-feed" id="log-feed">
+          <div class="empty">Waiting for detections…</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Weekly bar chart -->
+    <div class="card">
+      <div class="card-header"><span class="card-title">📈 Last 7 Days</span></div>
+      <div class="bar-chart" id="bar-chart"></div>
+    </div>
+
+  </div>
+
+  <!-- ── ATTENDANCE PAGE ── -->
+  <div class="page" id="page-attendance">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">📋 Attendance Records</span>
+        <div class="export-row">
+          <input type="date" id="att-date" onchange="loadAttendance()">
+          <button class="btn btn-ghost" onclick="exportCSV()">⬇ Export CSV</button>
+        </div>
+      </div>
+      <table>
+        <thead><tr><th>Name</th><th>Check-In Time</th><th>Status</th></tr></thead>
+        <tbody id="att-body"><tr><td colspan="3" class="empty">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── REGISTER PAGE ── -->
+  <div class="page" id="page-register">
+    <div class="card">
+      <div class="card-header"><span class="card-title">➕ Register New Face</span></div>
+      <div style="padding:20px">
+        <div class="reg-wrap">
+          <div class="reg-cam-wrap">
+            <img src="/register_feed" alt="Register Feed">
+            <div class="scan-line"></div>
+            <div class="cam-corner tl"></div>
+            <div class="cam-corner tr"></div>
+            <div class="cam-corner bl"></div>
+            <div class="cam-corner br"></div>
+          </div>
+
+          <div class="reg-panel">
+            <div>
+              <div style="font-size:.78rem;font-weight:600;color:var(--muted);
+                          text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">
+                Student Name
+              </div>
+              <input type="text" id="reg-name" placeholder="e.g. Vedant Raut" maxlength="50">
+            </div>
+
+            <button class="btn btn-primary" id="btn-start" onclick="startRegister()">
+              Start Registration
+            </button>
+
+            <div>
+              <div style="font-size:.78rem;font-weight:600;color:var(--muted);
+                          text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">
+                Samples Captured
+              </div>
+              <div class="sample-bar" id="sample-bar">
+                <div class="sample-dot">1</div>
+                <div class="sample-dot">2</div>
+                <div class="sample-dot">3</div>
+                <div class="sample-dot">4</div>
+                <div class="sample-dot">5</div>
+              </div>
+            </div>
+
+            <button class="btn btn-ghost" id="btn-capture" onclick="captureOne()" disabled>
+              📸 Capture Sample
+            </button>
+
+            <div class="reg-status" id="reg-status">
+              Enter a name and click Start Registration.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── STUDENTS PAGE ── -->
+  <div class="page" id="page-students">
+    <div class="card">
+      <div class="card-header"><span class="card-title">👥 Registered Students</span></div>
+      <table>
+        <thead><tr><th>#</th><th>Name</th><th>Registered On</th></tr></thead>
+        <tbody id="students-body"><tr><td colspan="3" class="empty">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+</main>
+
+<script>
+// ── Clock ────────────────────────────────────────────────────
+function updateClock() {
+  document.getElementById('clock').textContent =
+    new Date().toLocaleTimeString('en-IN', { hour12: false });
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ── Navigation ───────────────────────────────────────────────
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  event.currentTarget.classList.add('active');
+
+  if (id === 'attendance') loadAttendance();
+  if (id === 'students')   loadStudents();
+}
+
+// ── Stats ────────────────────────────────────────────────────
+async function loadStats() {
+  const d = await fetch('/api/stats').then(r => r.json());
+  document.getElementById('s-total').textContent   = d.total;
+  document.getElementById('s-present').textContent = d.present;
+  document.getElementById('s-absent').textContent  = d.absent;
+  document.getElementById('s-rate').textContent    = d.rate + '%';
+  renderBars(d.daily);
+  loadLogFeed();
+}
+
+function renderBars(daily) {
+  const chart = document.getElementById('bar-chart');
+  if (!daily.length) { chart.innerHTML = '<div class="empty" style="width:100%">No data yet</div>'; return; }
+  const max = Math.max(...daily.map(d => d.cnt), 1);
+  chart.innerHTML = daily.map(d => {
+    const pct = Math.round((d.cnt / max) * 68);
+    const lbl = d.date.slice(5);
+    return `<div class="bar-col">
+      <div class="bar" style="height:${pct}px" title="${d.cnt} present"></div>
+      <div class="bar-lbl">${lbl}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── Today's log ──────────────────────────────────────────────
+let knownLogs = new Set();
+async function loadLogFeed() {
+  const today = new Date().toISOString().slice(0, 10);
+  const rows  = await fetch('/api/attendance?date=' + today).then(r => r.json());
+  if (!rows.length) return;
+  const feed = document.getElementById('log-feed');
+  const hasEmpty = feed.querySelector('.empty');
+  if (hasEmpty) feed.innerHTML = '';
+
+  rows.forEach(r => {
+    const key = r.name + r.timestamp;
+    if (knownLogs.has(key)) return;
+    knownLogs.add(key);
+    const el = document.createElement('div');
+    el.className = 'log-entry';
+    el.innerHTML = `<span class="name">✅ ${r.name}</span>
+                    <span class="time">${r.timestamp.slice(11,19)}</span>`;
+    feed.prepend(el);
+  });
+}
+
+// ── Attendance table ─────────────────────────────────────────
+function loadAttendance() {
+  const dt = document.getElementById('att-date').value
+             || new Date().toISOString().slice(0, 10);
+  fetch('/api/attendance?date=' + dt).then(r => r.json()).then(rows => {
+    const tbody = document.getElementById('att-body');
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="3" class="empty">No records for this date.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = rows.map(r => `
+      <tr>
+        <td>${r.name}</td>
+        <td style="font-family:'JetBrains Mono',monospace;font-size:.8rem">${r.timestamp.slice(11,19)}</td>
+        <td><span class="pill pill-green">${r.status}</span></td>
+      </tr>`).join('');
+  });
+}
+
+// ── Students ─────────────────────────────────────────────────
+function loadStudents() {
+  fetch('/api/students').then(r => r.json()).then(rows => {
+    const tbody = document.getElementById('students-body');
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="3" class="empty">No students registered yet.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = rows.map((r, i) => `
+      <tr>
+        <td style="color:var(--muted);font-size:.78rem">${String(i+1).padStart(2,'0')}</td>
+        <td style="font-weight:600">${r.name}</td>
+        <td style="color:var(--muted);font-size:.82rem">${r.reg_date}</td>
+      </tr>`).join('');
+  });
+}
+
+// ── Registration ─────────────────────────────────────────────
+let regCount = 0;
+
+async function startRegister() {
+  const name = document.getElementById('reg-name').value.trim();
+  if (!name) { setRegStatus('Enter a name first.', 'err'); return; }
+
+  const res = await fetch('/api/register/start', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name })
+  }).then(r => r.json());
+
+  if (res.ok) {
+    regCount = 0;
+    resetDots();
+    document.getElementById('btn-capture').disabled = false;
+    document.getElementById('btn-start').disabled   = true;
+    setRegStatus(res.msg, '');
+  } else {
+    setRegStatus(res.msg, 'err');
+  }
+}
+
+async function captureOne() {
+  const res = await fetch('/api/register/capture', { method: 'POST' }).then(r => r.json());
+  if (!res.ok) { setRegStatus(res.msg, 'err'); return; }
+
+  regCount = res.count;
+  fillDots(regCount);
+  setRegStatus(res.msg, res.done ? 'ok' : '');
+
+  if (res.done) {
+    document.getElementById('btn-capture').disabled = true;
+    document.getElementById('btn-start').disabled   = false;
+    document.getElementById('reg-name').value       = '';
+    regCount = 0;
+    loadStats();
+  }
+}
+
+function fillDots(n) {
+  document.querySelectorAll('.sample-dot').forEach((d, i) => {
+    d.classList.toggle('filled', i < n);
+    if (i < n) d.textContent = '✓';
+  });
+}
+function resetDots() {
+  document.querySelectorAll('.sample-dot').forEach((d, i) => {
+    d.classList.remove('filled');
+    d.textContent = i + 1;
+  });
+}
+function setRegStatus(msg, type) {
+  const el = document.getElementById('reg-status');
+  el.textContent = msg;
+  el.className   = 'reg-status' + (type ? ' ' + type : '');
+}
+
+// ── Export ───────────────────────────────────────────────────
+function exportCSV() {
+  window.location.href = '/api/export?days=30';
+}
+
+// ── Set today's date in picker ────────────────────────────────
+document.getElementById('att-date').value = new Date().toISOString().slice(0, 10);
+
+// ── Auto-refresh ─────────────────────────────────────────────
+loadStats();
+setInterval(loadStats, 10000);
+</script>
+</body>
+</html>
